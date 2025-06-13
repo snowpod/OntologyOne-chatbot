@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: chatbot
+    env: docker
+    plan: free
+    dockerfilePath: Dockerfile
+    buildCommand: ""
+    startCommand: ""
+    envVars:
+      - fromGroup: OntologyOne-env
+    autoDeploy: true
+    healthCheckPath: /
