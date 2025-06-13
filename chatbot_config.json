@@ -1,0 +1,19 @@
+{
+    "voice": {
+      "voice_model": "gender_neutral_singaporean",
+      "speaking_speed": 1.0,
+      "pitch": 1.2
+    },
+    "chatbot_interactions": {
+      "_comment1": "no_gibberish_response: invalid",
+      "gibberish_found_response": "Hmm, that doesn't look like a valid question. Can you try rephrasing it?",
+
+      "_comment2": "out_of_scope_response: valid + out-of-scope",
+      "out_of_scope_response": "Question is out of scope.",
+
+      "_comment3": "no_relevant_ans_response: valid + in-scope + no answer",
+      "no_relevant_ans_response": "I couldn't find anything relevant for that question.",
+
+      "retry_later_response": "Quota exceeded. Please try again later."
+    }
+}
