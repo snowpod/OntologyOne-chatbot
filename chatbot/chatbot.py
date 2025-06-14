@@ -37,18 +37,19 @@ class ChatSession(BaseModel):
 # ---------- FastAPI Setup ----------
 app = FastAPI()
 
-env = os.environ.get("APP_ENV", "dev")  # default to 'dev' if not specified
-env_file = f".env.{env}"
-load_dotenv(dotenv_path=env_file)
-
+env = os.getenv("ENV", "dev")  # default to "dev" if ENV is not set
 if env == "dev":
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+    origins = ["http://localhost:3000"]  # your React dev server
+else:
+    origins = ["https://ontologyone-frontend.onrender.com"]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 if Path("build").exists():
     app.mount("/static", StaticFiles(directory="build", html=True), name="static")
