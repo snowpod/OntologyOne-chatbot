@@ -32,52 +32,47 @@ class ChatbotPromptBuilder:
             self.bot_name = self.config.get("chatbot", "name")
             self.app_name = self.config.get("hr-demo", "name")
 
-            self.profile_app = None
-            self.profile_technical = None
-            self.profile_persona = None
+            self.mode = ChatbotPromptBuilder.MODE_APP
+            self._loaded_profiles = {}
 
-            self.mode =  ChatbotPromptBuilder.MODE_APP
-            
             self.__class__._initialized = True
-    
+
     @classmethod
-    def is_request_for_app_info(cls, mode:str) -> bool:
-        return (mode == ChatbotPromptBuilder.MODE_APP)
-    
+    def is_request_for_app_info(cls, mode: str) -> bool:
+        return mode == cls.MODE_APP
+
     @classmethod
-    def is_request_for_tech_info(cls, mode:str) -> bool:
-        return (mode == ChatbotPromptBuilder.MODE_TECHNICAL)
-    
+    def is_request_for_tech_info(cls, mode: str) -> bool:
+        return mode == cls.MODE_TECHNICAL
+
     @classmethod
-    def is_request_for_chatbot_convo(cls, mode:str) -> bool:
-        return (mode == ChatbotPromptBuilder.MODE_PERSONA)
-    
+    def is_request_for_chatbot_convo(cls, mode: str) -> bool:
+        return mode == cls.MODE_PERSONA
+
     def infer_mode_from_input(self, input: str) -> str:
         input_lower = input.lower()
         words = set(re.findall(r'\w+', input_lower))
 
         app_specific_keywords = {
-            "advisor", "alarie", "aligning", "alignment", "america", "american", "app", 
-            "china", "chinese", "demo", "developer", "developers", "document", "documents", 
-            "documentation", "endpoint", "engineer", "engineers", "german", "germany", 
-            "globaltech", "member", "members", "motivation", "ontologyone", "ontologyone's", 
-            "project", "role", "roles", "singapore", "team", "timeline", "unified", "unifying", 
-            "us", "usa", "version", 
+            "advisor", "alarie", "aligning", "alignment", "america", "american", "app",
+            "china", "chinese", "demo", "developer", "developers", "document", "documents",
+            "documentation", "endpoint", "engineer", "engineers", "german", "germany",
+            "globaltech", "member", "members", "motivation", "ontologyone", "ontologyone's",
+            "project", "role", "roles", "singapore", "team", "timeline", "unified", "unifying",
+            "us", "usa", "version"
         }
 
-        app_related_phrases = {
-            "full stack", "the states", "use case"
-        }
+        app_related_phrases = {"full stack", "the states", "use case"}
 
         technical_keywords = {
-            "advantage", "advantages", "ai", "api", "architecture", "backend", "chatbot", 
-            "cloud", "code", "database", "databases", "diagram", "diagrams", "disadvantage", 
-            "disadvantages", "embedding", "embeddings", "fastapi", "framework", "frontend", 
-            "graph", "image", "images", "inference", "knowledge", "language", "languages", 
-            "layer", "layers", "llm", "markdown", "model", "models", "ontology", "ontologies", 
-            "openai", "owl", "pic", "picture", "pictures", "prompt", "python", "quadstore", 
-            "query", "rag", "rdf", "rdfs", "react", "reasoning", "semantic", "shacl", "sparql", 
-            "store", "system", "swrl", "tech", "technical", "technology", "technologies", 
+            "advantage", "advantages", "ai", "api", "architecture", "backend", "chatbot",
+            "cloud", "code", "database", "databases", "diagram", "diagrams", "disadvantage",
+            "disadvantages", "embedding", "embeddings", "fastapi", "framework", "frontend",
+            "graph", "image", "images", "inference", "knowledge", "language", "languages",
+            "layer", "layers", "llm", "markdown", "model", "models", "ontology", "ontologies",
+            "openai", "owl", "pic", "picture", "pictures", "prompt", "python", "quadstore",
+            "query", "rag", "rdf", "rdfs", "react", "reasoning", "semantic", "shacl", "sparql",
+            "store", "system", "swrl", "tech", "technical", "technology", "technologies",
             "token", "tools", "triplestore", "turtle", "ui", "ux", "vector"
         }
 
@@ -88,169 +83,79 @@ class ChatbotPromptBuilder:
             mode = ChatbotPromptBuilder.MODE_TECHNICAL
 
         if self.debug:
-            print("=========> {self.__class__.__name__} infer_mode mode = ", mode)
+            print(f"{self.__class__.__name__} infer_mode mode = {mode}")
 
         return mode
-    
-    def get_mode(self):
-        return self.mode
-    
+
     def get_profile(self, chat_mode) -> str:
         if chat_mode != self.mode:
             self.mode = chat_mode
 
-        system_prompt = ""
-        if self.mode == ChatbotPromptBuilder.MODE_APP:
-            system_prompt = self.build_app_prompt()
-        elif self.mode == ChatbotPromptBuilder.MODE_TECHNICAL:
-            system_prompt = self.build_technical_prompt()
-        elif self.mode == ChatbotPromptBuilder.MODE_PERSONA:
-            system_prompt = self.build_persona_prompt()
+        if chat_mode == self.MODE_APP:
+            prompt = self.build_app_prompt()
+        elif chat_mode == self.MODE_TECHNICAL:
+            prompt = self.build_technical_prompt()
+        elif chat_mode == self.MODE_PERSONA:
+            prompt = self.build_persona_prompt()
         else:
-            raise ValueError(f"{self.__class__.__name__} get_system_prompt Unknown mode: {mode}")
+            raise ValueError(f"Unknown mode: {chat_mode}")
 
-        return f"### Assistant_Profile\n{system_prompt}"
+        return f"### Assistant_Profile\n{prompt}"
 
-    def get_user_prompt(self, user_message:str, doc_context:str, story_context:str, image_context, chat_history_context:str) -> str:
-        """
-        the user prompt will comprise:
-        doc_context: contents of RAG docs - ontology narratives, use case description
-        story context: contents of origin stories
-        image_context: image url and description used to generate image thumbnails
-        chat history: currently 2 pairs of previous user-bot message to provide historical context
-        """
-        user_message = f"### Current_User_Question\n{user_message}"
-
-        if doc_context:
-            doc_context = f"### Document_Context\n{doc_context}"
-        else:
-            doc_context = None
-
-        if story_context:
-            story_context = f"### Story_Context\n{story_context}"
-        else:
-            story_context = None
-
+    def get_user_prompt(self, user_message: str, doc_context: str, story_context: str, image_context, chat_history_context: str) -> str:
+        context_list = []
         if image_context:
-            image_context = f"### Diagram_Context\n{image_context}"
-        else:
-            image_context = None
-
+            context_list.append(f"### Diagram_Context\n{image_context}")
+        if doc_context:
+            context_list.append(f"### Document_Context\n{doc_context}")
+        if story_context:
+            context_list.append(f"### Story_Context\n{story_context}")
         if chat_history_context:
-            chat_history_context = f"### Conversation_History\n{chat_history_context}"
-        else:
-            chat_history_context = None
+            context_list.append(f"### Conversation_History\n{chat_history_context}")
 
-        # user_prompt = rag text context + stories context (if keywords detected) + chat history + user query
-        context_list = [image_context, doc_context, story_context, chat_history_context, user_message]
-        user_prompt = "\n\n".join(filter(None, context_list))  # filter out None values
+        context_list.append(f"### Current_User_Question\n{user_message}")
+        return "\n\n".join(context_list)
 
-        return user_prompt
-    
-    def _get_profile(self, mode) -> Optional[dict]:
-        profile = None
-        if mode == ChatbotPromptBuilder.MODE_APP:
-            profile = self.profile_app
-        elif mode == ChatbotPromptBuilder.MODE_TECHNICAL:
-            profile = self.profile_technical
-        elif mode == ChatbotPromptBuilder.MODE_PERSONA:
-            profile = self.profile_persona
-
-        return profile
-
-    def get_story_by_memory_triggers(self, mode) -> Optional[dict]:
-        profile = self._get_profile(mode)
-        if profile is None:
-            profile = self._load_profile_for_mode(mode)
-
-        return profile.get("boundaries").get("story_by_memory_triggers")
+    def _smart_join(self, items, prefix="- ", sep=", ", last_sep="and"):
+        if isinstance(items, dict):
+            return "\n".join(f"{prefix}{k}{sep}{v}" for k, v in items.items())
+        if isinstance(items, (list, set)):
+            items = sorted(items) if isinstance(items, set) else items
+            if len(items) == 0:
+                return ""
+            if len(items) == 1:
+                return items[0]
+            return f"{sep.join(items[:-1])} {last_sep} {items[-1]}"
+        if isinstance(items, str):
+            return items
+        return str(items)
 
     def _get_profile_for_mode(self, mode: str) -> Optional[dict]:
-        if mode == ChatbotPromptBuilder.MODE_APP:
-            if self.profile_app:
-                return self.profile_app
-            return self._load_profile_for_mode(mode)
-        elif mode == ChatbotPromptBuilder.MODE_TECHNICAL:
-            if self.profile_technical:
-                return self.profile_technical
-            return self._load_profile_for_mode(mode)
-        elif mode == ChatbotPromptBuilder.MODE_PERSONA:
-            if self.profile_persona:
-                return self.profile_persona
-            return self._load_profile_for_mode(mode)
-        
-        raise ValueError(f"Invalid mode: {mode}. Expected one of {ChatbotPromptBuilder.MODE_APP}, {ChatbotPromptBuilder.MODE_TECHNICAL}, {ChatbotPromptBuilder.MODE_PERSONA}.") 
-            
-    def _load_profile_for_mode(self, mode: str) -> Optional[dict]:
+        if mode in self._loaded_profiles:
+            return self._loaded_profiles[mode]
+
         profile_path_str = self.config.get("chatbot", "profile_path")
-        profile_file_names = (self.config.get("chatbot", f"load_{mode}_profile")).split(",")
-        profile_file_names = [p.strip() for p in profile_file_names]
-        
-        base_dir = Path(__file__).parent  # points to backend/
-        profile_path = (base_dir / profile_path_str).resolve()
+        file_names = self.config.get("chatbot", f"load_{mode}_profile").split(",")
+        base_dir = Path(__file__).parent
+        profile_dir = (base_dir / profile_path_str).resolve()
 
-        merged_profile = {}
-        for profile_file_name in profile_file_names:
-            profile_file_path = profile_path / profile_file_name
-
-            if self.debug:
-                print(f"{self.__class__.__name__} 🔍 Loading profile: {profile_file_path}")
-
+        merged = {}
+        for fname in map(str.strip, file_names):
+            path = profile_dir / fname
+            if not path.exists():
+                self.app_logger.error(f"Missing profile: {path}")
+                continue
             try:
-                with open(profile_file_path, "r", encoding="utf-8") as f:
-                    content = f.read()
-                    template = Template(content)
-                    substituted = template.substitute(app_name=self.app_name, bot_name=self.bot_name)
-                    profile_data = json.loads(substituted)
-                    merged_profile.update(profile_data)  # merge into final dict
+                with open(path, "r", encoding="utf-8") as f:
+                    template = Template(f.read())
+                    content = template.substitute(app_name=self.app_name, bot_name=self.bot_name)
+                    merged.update(json.loads(content))
+            except Exception as e:
+                self.app_logger.error(f"Error loading profile {path}: {e}")
 
-            except FileNotFoundError:
-                self.app_logger.error(f"{self.__class__.__name__} Missing profile: {profile_file_path}")
-                continue
-            except json.JSONDecodeError as e:
-                self.app_logger.error(f"{self.__class__.__name__} JSON error in profile {profile_file_path}: {e}")
-                continue
-
-        # update the profile for the specific mode
-        if mode == ChatbotPromptBuilder.MODE_PERSONA:
-            self.profile_persona = merged_profile
-        elif mode == ChatbotPromptBuilder.MODE_TECHNICAL:   
-            self.profile_technical = merged_profile
-        elif mode == ChatbotPromptBuilder.MODE_APP:
-            self.profile_app = merged_profile
+        self._loaded_profiles[mode] = merged
+        return merged
     
-        return merged_profile if merged_profile else None
-
-    def _filter_visible(self, items: list[dict], system_mode: bool) -> list[str]:
-        return [
-            item["text"] for item in items
-            if item.get("system_visibility", not system_mode)  # default True for persona, False for system
-        ]
-
-    def _smart_join(self, entries:dict, prefix:str="- ", sep=": "):
-        joined_str = ""
-        for key, value in entries.items():
-          joined_str += f"{prefix}{key}{sep}{value}\n"
-        return joined_str
-
-    def _smart_join(self, items:list[str], prefix:str="", sep:str=", ", last_sep:str="and"):
-        """
-        Join a list of strings with a given separator and custom last separator (e.g., 'and' or 'or').
-
-        Parameters:
-        - items: list of strings to join
-        - sep: separator between all items except the last (default: ', ')
-        - last_sep: the word to use before the final item (default: 'and')
-
-        Returns:
-        - A string that joins the items nicely using sep and last_sep
-        """
-        if not items:
-            return ""
-        if len(items) == 1:
-            return items[0]
-        return f"{sep.join(items[:-1])} {last_sep} {items[-1]}"
-
     def _format_block(self, items: Union[list, set, str], prefix: str = "- ") -> str:
         if not items:
             return "(none)"

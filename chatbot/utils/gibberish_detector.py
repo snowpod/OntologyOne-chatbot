@@ -1,6 +1,5 @@
 import re
 import string
-import wordfreq
 
 class GibberishDetector:
 
@@ -73,7 +72,12 @@ class GibberishDetector:
         return True  # If not known word and failed other checks, assume gibberish
 
     def _is_known_word(self, token):
-        return wordfreq.word_frequency(token, lang="en") > 0
+        try:
+            from wordfreq import word_frequency
+        except ImportError:
+            raise RuntimeError("wordfreq is not installed or available")
+
+        return word_frequency(token, lang="en") > 0
 
     def _is_keyboard_smash(self, token):
         token = token.lower()
