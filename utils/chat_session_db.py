@@ -1,7 +1,9 @@
 import os
 import psycopg2
-from psycopg2 import pool
-from psycopg2.extras import RealDictCursor
+import time
+
+from psycopg2 import pool, sql
+from psycopg2.extras import RealDictCursor 
 
 from utils.config import Config
 
@@ -38,13 +40,25 @@ class Database:
         self.db_url = db_url
 
     def _get_connection(self):
-        conn = self._pool.getconn()
-        conn.autocommit = False
-        with conn.cursor() as cursor:
-            cursor.execute(f"SET search_path TO {db_schema};")
-        return conn
+        print(f"[DB] Getting connection for schema: {db_schema}")
+        retries = 3
+        for attempt in range(retries):
+            try:
+                conn = self._pool.getconn()
+                conn.autocommit = False
+                with conn.cursor() as cursor:
+                    cursor.execute(
+                        sql.SQL("SET search_path TO {}").format(sql.Identifier(db_schema))
+                    )
+                return conn
+            except psycopg2.OperationalError as e:
+                if attempt < retries - 1:
+                    time.sleep(1)
+                    continue
+                raise e
 
     def _release_connection(self, conn):
+        print(f"[DB] Releasing connection for schema: {db_schema}")
         self._pool.putconn(conn)
 
     def create_tables(self):
