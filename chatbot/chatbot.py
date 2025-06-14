@@ -14,8 +14,9 @@ from pydantic import BaseModel
 from typing import List
 
 from utils.ai_client import AIClient
-from utils.chatbot_config import ChatbotConfig
 from utils.chat_session_db import Database
+from utils.chatbot_config import ChatbotConfig
+from utils.chatbot_prompt_builder import ChatbotPromptBuilder
 from utils.config import Config
 from utils.embedding_service import EmbeddingService
 from utils.gibberish_detector import GibberishDetector
@@ -77,6 +78,9 @@ database.create_tables()
 
 embedding_service = EmbeddingService()
 gibberish_detector = GibberishDetector()
+
+prompt_builder = ChatbotPromptBuilder()
+chat_mode = prompt_builder.get_mode()
 
 chatbot_config = ChatbotConfig()
 ai_client = AIClient()
@@ -330,8 +334,8 @@ async def chat_with_bot(session_id: str, request: ChatRequest):
         if debug:
             print(f"chatbot enriched_user_message: {enriched_user_message}, tags: {tags}")
         
-        mode = ai_client.infer_mode_from_input(enriched_user_message)
-        chatbot_profile = ai_client.get_chatbot_profile(mode)
+        chat_mode = prompt_builder.infer_mode_from_input(enriched_user_message)
+        chatbot_profile = prompt_builder.get_profile(chat_mode)
 
         # get stories context regardless of mode
         story_context = None
@@ -343,7 +347,7 @@ async def chat_with_bot(session_id: str, request: ChatRequest):
 
         # get doc and image context for app mode only; technical/persona mode => None
         doc_context, image_context = None, None
-        if ai_client.is_request_for_app_info(mode):
+        if prompt_builder.is_request_for_app_info(chat_mode):
             doc_context = _get_doc_context(session_id, user_message, tags)
 
             # if app mode, we will use all the matched stories
@@ -352,19 +356,19 @@ async def chat_with_bot(session_id: str, request: ChatRequest):
 
             image_context = _get_image_context(session_id, user_message)
 
-        elif ai_client.is_request_for_tech_info:
+        elif prompt_builder.is_request_for_tech_info(chat_mode):
             # if technical mode, we will use only the first matched stories since
             # it is unlikely that the stories will be required but just in case
             if story_matches:
                 story_context = _get_story_context([story_matches[0]])
         
-        elif ai_client.is_request_for_chatbot_convo:
+        elif prompt_builder.is_request_for_chatbot_convo(chat_mode):
             # if persona mode, we will use all the matched stories
             if story_matches:
                 story_context = _get_story_context(story_matches)
         
         # now that we have assembled all the required context, call the LLM
-        user_prompt = ai_client.get_user_prompt(user_message, doc_context, story_context, image_context, chat_history_context)
+        user_prompt = prompt_builder.get_user_prompt(user_message, doc_context, story_context, image_context, chat_history_context)
         bot_response = _generate_AI_response(chatbot_profile, user_prompt)
 
     except httpx.HTTPStatusError as e:
