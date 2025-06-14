@@ -76,25 +76,6 @@ def _fetch_latest_commit_sha(doc_store:str, sha_url_template_key:str,
         app_logger.error(f"github_store_client Response: {response.json()}")
         raise Exception("Failed to fetch commits from GitHub")
 
-def fetch_image_url1(file_name:str) -> str:
-    #commit_sha = _fetch_image_latest_commit_sha(image_filename)
-    #print("image commit_sha:", commit_sha)
-    return (config.get(IMG_STORE, IMG_FILE_URL).format(owner=img_store_owner,
-                                                       repo=img_store_repo, 
-                                                       #commit_sha=commit_sha,
-                                                       project=img_store_project,
-                                                       images_folder=images_folder,
-                                                       filename=file_name))
-
-def fetch_doc_url1(file_name:str) -> str:
-    #commit_sha = _fetch_doc_latest_commit_sha(filename)
-    #print("doc commit_sha:", commit_sha)
-    return (config.get(DOC_STORE, DOC_FILE_URL).format(owner=doc_store_owner, 
-                                                       repo=doc_store_repo, 
-                                                       #commit_sha=commit_sha, 
-                                                       project=doc_store_project,
-                                                       filename=file_name))
-
 def _fetch_file_url(file_name:str, folder:str) -> str:
     if folder:
         return file_url_child_folder.format(owner=doc_store_owner, 
@@ -107,9 +88,6 @@ def _fetch_file_url(file_name:str, folder:str) -> str:
                                        repo=doc_store_repo, 
                                        project=doc_store_project,
                                        filename=file_name)
-
-def fetch_image_url(file_name:str) -> str:
-    return _fetch_file_url(file_name, images_folder)
 
 def _get_formatted_cached_file_path(project:str, filename:str, folder:str=None) -> str:
     # Return constructed cached file path
@@ -139,8 +117,10 @@ def _fetch_cached_file_path(project: str, file_name: str, folder:str) -> str:
 
     return cached_file_path
 
+def fetch_image_url(file_name:str) -> str:
+    return _fetch_file_url(file_name, images_folder)
+
 def fetch_cached_image_path(project:str, file_name:str) -> str:
-    #folder = config.get(DOC_STORE, IMAGES_FOLDER)
     return _fetch_cached_file_path(project, file_name, images_folder)
 
 def fetch_cached_doc_path(project: str, file_name: str) -> str:

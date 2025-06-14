@@ -5,13 +5,12 @@ import re
 import uuid
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 from pydantic import BaseModel
-from typing import List
 
 from utils.ai_client import AIClient
 from utils.chat_session_db import Database
@@ -33,7 +32,7 @@ class ChatRequest(BaseModel):
 
 class ChatSession(BaseModel):
     session_id: str
-    history: List[ChatMessage] = []
+    history: list[ChatMessage] = []
 
 # ---------- FastAPI Setup ----------
 app = FastAPI()
@@ -101,7 +100,7 @@ def load_metadata(json_file_path):
     except json.JSONDecodeError as e:
         raise ValueError(f"Error decoding JSON from {json_file_path}: {e}")
 
-def _process_matches(text_matches, top_n_text_hits, extract_pages_from_doc)-> List[str]:
+def _process_matches(text_matches, top_n_text_hits, extract_pages_from_doc)-> list[str]:
     text_contents = []
 
     for match in text_matches[:top_n_text_hits]:

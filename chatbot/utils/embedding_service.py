@@ -1,14 +1,5 @@
 # utils/embedding_service.py
 
-from typing import List
-
-# imports to support semantic search for stories
-from sentence_transformers import SentenceTransformer
-from sklearn.metrics.pairwise import cosine_similarity
-
-#from langchain.embeddings import OpenAIEmbeddings
-#from openai.embeddings_utils import get_embedding
-
 from utils.chatbot_prompt_builder import ChatbotPromptBuilder
 from utils.config import Config
 from utils.image_search_helper import ImageSearchHelper
@@ -23,21 +14,11 @@ class EmbeddingService:
         self.debug = self.config.get("hr-demo", "debug").lower() == "true"
         self.app_logger = get_logger(self.config.get("log", "app"))
 
-    #    self.config = Config()
-    #    self.text_model_name = self.config.get("embedding", "text_model")
-    #    self.text_model = SentenceTransformer(self.text_model_name)
-
-    #    self.image_model_name = self.config.get("embedding", "image_model")
-    #    self.image_model = SentenceTransformer(self.image_model_name)
-
         self.vectordb = VectorDB()
         
         self.imageSearchHelper = ImageSearchHelper()
 
         self.chatbotPromptBuilder = ChatbotPromptBuilder()
-
-        #stories_embedding_model = SentenceTransformer("all-mpnet-base-v2")
-        #self.stories_embedding_model = stories_embedding_model
 
     def set_document_text(self, file_bytes: str) -> str:
         """Extract all text from the entire document."""
@@ -51,13 +32,13 @@ class EmbeddingService:
         """Use PDFDocument to extract text from specific pages."""
         return self.pdf_document.extract_pages_text(start_page, end_page, headerFooterText)
 
-    def generate_text_embedding(self, text: str) -> List[float]:
+    def generate_text_embedding(self, text: str) -> list[float]:
         return self.vectordb.generate_embedding_for_text(text)
         
-    def generate_image_embedding(self, text: str) -> List[float]:
+    def generate_image_embedding(self, text: str) -> list[float]:
         return self.vectordb.generate_embedding_for_image(text)
     
-    def search_image_embeddings(self, query:str) -> List[tuple]:
+    def search_image_embeddings(self, query:str) -> list[tuple]:
         self.imageSearchHelper.update_context(query)
         enriched_query = self.imageSearchHelper.enrich_query(query)
         if self.debug:
@@ -90,9 +71,6 @@ class EmbeddingService:
             image_matches = filteredMatches
 
         return image_matches
-
-    #def _embed_text_for_stories(self, texts: List[str]):
-    #    return self.stories_embedding_model.encode(texts, convert_to_numpy=True)
            
     def get_doc_namespace(self):
         return self.config.get("vectordb", "doc_namespace")

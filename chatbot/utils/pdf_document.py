@@ -1,7 +1,6 @@
 # utils/pdf_document.py
 
 import fitz  # PyMuPDF
-import os 
 
 from utils.config import Config
 from utils.logging import get_logger
@@ -29,6 +28,6 @@ class PDFDocument:
             text += page_text + "\n"
 
         if self.debug:
-            print("PDFDocument text:", text)
+            print(f"{self.__class__.__name__} text: {text}")
 
         return text

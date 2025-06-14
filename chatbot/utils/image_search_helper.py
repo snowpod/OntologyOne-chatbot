@@ -1,12 +1,8 @@
 # image_search_helper.py
 
-import clip
 import json
 import os
 import re
-import torch
-
-from rapidfuzz import fuzz, process
 
 from utils.config import Config
 from utils.logging import get_logger
@@ -17,10 +13,16 @@ class ImageSearchHelper:
         config = Config()
         self.debug = config.get("hr-demo", "debug").lower() == "true"
         self.app_name = config.get("hr-demo", "name")
-        
+
         self.app_logger = get_logger(config.get("log", "app"))
 
-        image_model_name = config.get("embedding", "image_model")
+        self.config = config
+        self.clip = None
+        self.torch = None
+        self.model = None
+        self.preprocess = None
+        self.device = None
+
         image_metadata_path = config.get("embedding", "image_metadata_path")
         image_search_config_path = config.get("embedding", "image_search_config_path")
 
@@ -29,26 +31,32 @@ class ImageSearchHelper:
             self.metadata = self.load_metadata(image_metadata_path)
         except Exception as e:
             raise
-    
+
         self.image_search_config = self.load_metadata(image_search_config_path)
         self.ontology_keywords = set(self.image_search_config.get("ONTOLOGY_KEYWORDS", []))
         self.focus_keywords = set(self.image_search_config.get("FOCUS_KEYWORDS", []))
-        #self.media_keywords = set(config.get("MEDIA_KEYWORDS", []))
-        #self.canonical_keywords = sorted(self.ontology_keywords | self.focus_keywords | self.media_keywords)
         self.canonical_keywords = sorted(self.ontology_keywords | self.focus_keywords)
         self.stopwords = set(self.image_search_config.get("STOPWORDS", []))
         self.manual_corrections = self.image_search_config.get("MANUAL_CORRECTIONS", {})
 
         self.context = {}
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.model, self.preprocess = clip.load(image_model_name, device=self.device)
+
+    def _load_clip_model(self):
+        if self.clip is None or self.torch is None:
+            import clip
+            import torch
+            self.clip = clip
+            self.torch = torch
+            self.device = "cuda" if torch.cuda.is_available() else "cpu"
+            image_model_name = self.config.get("embedding", "image_model")
+            self.model, self.preprocess = clip.load(image_model_name, device=self.device)
 
     def get_ontology_keywords(self):
         return self.ontology_keywords
-    
+
     def get_focus_keywords(self):
         return self.focus_keywords
-    
+
     def get_metadata(self):
         return self.metadata
 
@@ -65,8 +73,11 @@ class ImageSearchHelper:
                 return json.load(f)
         except json.JSONDecodeError as e:
             raise ValueError(f"{self.__class__.__name__} Error decoding JSON from {json_file_path}: {e}")
-        
+
     def _extract_keywords(self, text, score_threshold=90):
+        import re
+        from rapidfuzz import fuzz, process
+
         words = re.findall(r'\b\w+\b', text.lower())
         keywords = []
 
@@ -99,7 +110,6 @@ class ImageSearchHelper:
             self.context["last_focus"] = matched_focus[-1]
 
     def enrich_query(self, user_query):
-        # Apply manual corrections to the raw user query
         tokens = re.findall(r"\w+|[^\w\s]", user_query, re.UNICODE)
         corrected_tokens = [
             self.manual_corrections.get(token.lower(), token) if token.isalnum() else token
@@ -107,31 +117,20 @@ class ImageSearchHelper:
         ]
         corrected_query = " ".join(corrected_tokens)
 
-        # Extract keywords from corrected query (for context logic only)
         keywords = self._extract_keywords(corrected_query)
 
         parts = []
-
-        # Determine if ontology keywords should be injected
         query_lower = corrected_query.lower()
         pattern = rf"\b{re.escape(self.app_name.lower())}('s)?\b"
         has_location_keyword = any(k in self.ontology_keywords for k in keywords)
-
-        # should_inject_ontology = not (mentions_app_name and not has_location_keyword)
         should_inject_ontology = not has_location_keyword
 
-        # chat_context = {
-        #    "last_location": "singapore",
-        #    "last_focus": "classes"
-        # }
-        # Inject location if missing AND allowed
         if should_inject_ontology and not has_location_keyword:
             if self.context.get("last_location"):
                 parts.append(self.context["last_location"])
 
         parts.append(corrected_query)
 
-        # Inject focus if missing
         if not any(k in self.focus_keywords for k in keywords):
             if self.context.get("last_focus"):
                 parts.append(self.context["last_focus"])
@@ -139,14 +138,15 @@ class ImageSearchHelper:
         return " ".join(parts)
 
     def _embed_texts(self, texts):
-        with torch.no_grad():
-            tokens = clip.tokenize(texts).to(self.device)
+        self._load_clip_model()
+        with self.torch.no_grad():
+            tokens = self.clip.tokenize(texts).to(self.device)
             embeddings = self.model.encode_text(tokens)
             embeddings /= embeddings.norm(dim=-1, keepdim=True)
         return embeddings
 
-    def search(self, enriched_query:str, top_k_hits:int=None):
-        top_k_score_threshold = self.image_search_config.get("TOP_K_SCORE_THRESHOLD", 0.8)    
+    def search(self, enriched_query: str, top_k_hits: int = None):
+        top_k_score_threshold = self.image_search_config.get("TOP_K_SCORE_THRESHOLD", 0.8)
         if top_k_hits is None:
             top_k_hits = self.image_search_config.get("TOP_K_HITS", 3)
 
@@ -160,25 +160,17 @@ class ImageSearchHelper:
             for item, score in zip(self.metadata, similarities)
         ]
         sorted_results = sorted(scored_results, key=lambda x: x[1], reverse=True)
-
         filtered = [r for r in sorted_results if r[1] >= top_k_score_threshold]
 
         return (filtered[:top_k_hits] if len(filtered) > top_k_hits else filtered, sorted_results)
-    
+
     def get_acceptable_k_hits(self):
-       return self.image_search_config.get("ACCEPTABLE_K_HITS")
-    
+        return self.image_search_config.get("ACCEPTABLE_K_HITS")
+
     def get_acceptable_score_threshold(self):
         return self.image_search_config.get("ACCEPTABLE_SCORE_THRESHOLD")
 
-    def get_acceptable_matches(self, all_matches:list[tuple]) -> list[tuple]:
-        """
-        we are trying to look for at most x number of images that have acceptable scores
-        defined by acceptable_match_threshold.
-        here, we assume that all_matches are already sorted in descending order of scores
-
-        x = acceptable_k_hits
-        """
+    def get_acceptable_matches(self, all_matches: list[tuple]) -> list[tuple]:
         acceptable_k_hits = self.get_acceptable_k_hits()
         acceptable_score_threshold = self.get_acceptable_score_threshold()
 
@@ -192,10 +184,10 @@ class ImageSearchHelper:
                 break
 
         return filtered_matches
-    
-    def simple_print_result(self, result:list[dict]):
+
+    def simple_print_result(self, result: list[dict]):
         if result:
-            for file_name, score, description  in result:
+            for file_name, score, description in result:
                 print(f"{self.__class__.__name__} {file_name}, score: {score:.4f}")
         else:
             print(f"{self.__class__.__name__} ⚠️ No image matches found.")

@@ -4,8 +4,7 @@ import ast
 import configparser
 from pathlib import Path
 
-from utils.logging import get_logger, get_stdout_logger
-
+from utils.logging import get_stdout_logger
 
 class Config:
     _instance = None

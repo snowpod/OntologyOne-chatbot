@@ -45,7 +45,6 @@ class AIClient:
             raise RuntimeError(err_msg) from e
 
         except Exception as e:
-            # Detected a 429 error
             if hasattr(e, "response") and getattr(e.response, "status_code", None) == 429:
                 err_msg = f"{self.__class__.__name__} 429 Too Many Requests: {e}"
                 self.app_logger.warning(err_msg)

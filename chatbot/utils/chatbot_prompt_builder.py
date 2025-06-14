@@ -5,7 +5,7 @@ import re
 
 from pathlib import Path
 from string import Template
-from typing import List, Dict, Optional, Union
+from typing import Optional, Union
 
 from utils.config import Config
 from utils.logging import get_logger
@@ -40,20 +40,6 @@ class ChatbotPromptBuilder:
             
             self.__class__._initialized = True
     
-    """
-    @classmethod
-    def get_app_mode(cls) -> str:
-        return ChatbotPromptBuilder.MODE_APP
-
-    @classmethod
-    def get_technical_mode(cls) -> str:
-        return ChatbotPromptBuilder.MODE_TECHNICAL
-
-    @classmethod
-    def get_persona_mode(cls) -> str:
-        return ChatbotPromptBuilder.MODE_PERSONA
-    """
-
     @classmethod
     def is_request_for_app_info(cls, mode:str) -> bool:
         return (mode == ChatbotPromptBuilder.MODE_APP)
@@ -161,7 +147,7 @@ class ChatbotPromptBuilder:
 
         return user_prompt
     
-    def _get_profile(self, mode) -> Optional[Dict]:
+    def _get_profile(self, mode) -> Optional[dict]:
         profile = None
         if mode == ChatbotPromptBuilder.MODE_APP:
             profile = self.profile_app
@@ -172,14 +158,14 @@ class ChatbotPromptBuilder:
 
         return profile
 
-    def get_story_by_memory_triggers(self, mode) -> Optional[Dict]:
+    def get_story_by_memory_triggers(self, mode) -> Optional[dict]:
         profile = self._get_profile(mode)
         if profile is None:
             profile = self._load_profile_for_mode(mode)
 
         return profile.get("boundaries").get("story_by_memory_triggers")
 
-    def _get_profile_for_mode(self, mode: str) -> Optional[Dict]:
+    def _get_profile_for_mode(self, mode: str) -> Optional[dict]:
         if mode == ChatbotPromptBuilder.MODE_APP:
             if self.profile_app:
                 return self.profile_app
@@ -195,7 +181,7 @@ class ChatbotPromptBuilder:
         
         raise ValueError(f"Invalid mode: {mode}. Expected one of {ChatbotPromptBuilder.MODE_APP}, {ChatbotPromptBuilder.MODE_TECHNICAL}, {ChatbotPromptBuilder.MODE_PERSONA}.") 
             
-    def _load_profile_for_mode(self, mode: str) -> Optional[Dict]:
+    def _load_profile_for_mode(self, mode: str) -> Optional[dict]:
         profile_path_str = self.config.get("chatbot", "profile_path")
         profile_file_names = (self.config.get("chatbot", f"load_{mode}_profile")).split(",")
         profile_file_names = [p.strip() for p in profile_file_names]
@@ -235,19 +221,19 @@ class ChatbotPromptBuilder:
     
         return merged_profile if merged_profile else None
 
-    def _filter_visible(self, items: List[Dict], system_mode: bool) -> List[str]:
+    def _filter_visible(self, items: list[dict], system_mode: bool) -> list[str]:
         return [
             item["text"] for item in items
             if item.get("system_visibility", not system_mode)  # default True for persona, False for system
         ]
 
-    def _smart_join(self, entries:Dict, prefix:str="- ", sep=": "):
+    def _smart_join(self, entries:dict, prefix:str="- ", sep=": "):
         joined_str = ""
         for key, value in entries.items():
           joined_str += f"{prefix}{key}{sep}{value}\n"
         return joined_str
 
-    def _smart_join(self, items:List[str], prefix:str="", sep:str=", ", last_sep:str="and"):
+    def _smart_join(self, items:list[str], prefix:str="", sep:str=", ", last_sep:str="and"):
         """
         Join a list of strings with a given separator and custom last separator (e.g., 'and' or 'or').
 
@@ -281,7 +267,7 @@ class ChatbotPromptBuilder:
         return self._format_block(items, prefix)
 
     # load chatbot's essence - common to all modes
-    def build_chatbot_core(self, mode:str, profile:Dict) -> str:
+    def build_chatbot_core(self, mode:str, profile:dict) -> str:
         bot_name = profile.get('name')
         bot_role = profile.get('role')
         bot_office = profile.get('office')
@@ -310,7 +296,7 @@ You work {bot_office}; when ask for gender and age, you {bot_gender}.
 Notes: 
 {bot_notes}"""
 
-    def _build_response_logic(self, profile:Dict) -> str:
+    def _build_response_logic(self, profile:dict) -> str:
         knowledge_scope = profile.get('knowledge_scope')
         assumed_user_knowledge = profile.get('assumed_user_knowledge', "")
 
@@ -337,7 +323,7 @@ Notes:
 
         return prompt
 
-    def _build_response_format(self, profile:Dict) -> str:          
+    def _build_response_format(self, profile:dict) -> str:          
         response_style = profile.get("style")
         length_limit = profile.get("length_limit")
         formatting = profile.get("formatting")
@@ -345,7 +331,7 @@ Notes:
         return f"""Your replies are {response_style}. You respond using a {length_limit}. You:
 {self._build_section(formatting)}. """
 
-    def _build_style_guide(self, profile:Dict) -> str:
+    def _build_style_guide(self, profile:dict) -> str:
         writing = profile.get("writing")
         writing_format = writing.get("format")
         writing_preferences = self._smart_join(writing.get("preferences"))
@@ -353,7 +339,7 @@ Notes:
         return f"Your writing style is {writing_format}. You use {writing_preferences}."
 
     # specifies the operational guardrails
-    def _build_operational_boundaries(self, profile:Dict) -> str:
+    def _build_operational_boundaries(self, profile:dict) -> str:
         safety_and_ethics = profile.get("safety_and_ethics")
         sae_bias_avoidance = self._build_section(safety_and_ethics.get("bias_avoidance"))
         sae_language = self._build_section(safety_and_ethics.get("language"))
@@ -381,7 +367,7 @@ Notes:
 
     # specifies the narratives that the chatbot can share with the user
     # chatbot is generally allowed to make up interactions with E.V. Alarie but not real team members
-    def _build_narrative_boundaries(self, profile:Dict) -> str:
+    def _build_narrative_boundaries(self, profile:dict) -> str:
         return self._build_section(profile)
 
     def build_app_prompt(self) -> str:
@@ -437,7 +423,7 @@ Operational boundaries to observe:
 Narrative boundaries to observe:
 {narrative_boundaries}"""
 
-    def build_personal_information(self, profile:Dict) -> str:
+    def build_personal_information(self, profile:dict) -> str:
         appearance = ""
         for key, value in profile.get("appearance").items():
             appearance += f"- {key}: {value}\n"

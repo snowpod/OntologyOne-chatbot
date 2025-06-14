@@ -108,33 +108,3 @@ class VectorDB:
         result = self.text_index.query(**query_params)
 
         return result['matches']
-
-    # currently unused cos the accuracy for tect to image search is too poor
-    def search_image(self, namespace, query_vector: list[float], top_k: int = 5, metadata_filter: dict = None) -> list[dict]:
-        try:
-            query_params = {
-                "vector": query_vector,
-                "top_k": top_k,
-                "include_metadata": True,
-                "namespace": namespace
-            }
-            if metadata_filter:
-                query_params["filter"] = metadata_filter
-
-            if self.debug:
-                print(f"{self.__class__.__name__} search_image metadata_filter: {metadata_filter}")
-
-            results = self.image_index.query(**query_params)
-            matches = results.get("matches", [])
-            for match in matches:
-                metadata = match.get("metadata", {})
-                if "id" in match:
-                    metadata["file_name"] = os.path.basename(match["id"])
-            return [match.get("metadata", {}) for match in matches]
-
-        except Exception as e:
-            err_msg = f"{self.__class__.__name__} Text-to-image search failed: {e}"
-            if self.debug:
-                print(err_msg)
-            self.app_logger.error(err_msg)
-            return []
