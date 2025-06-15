@@ -4,7 +4,6 @@ import os
 import re
 import uuid
 
-from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -296,11 +295,9 @@ def enrich_query(session_id: str, user_message: str) -> tuple[str, list[str]]:
     return enriched_query, tags
 
 # ---------- Routes ----------
-@app.get("/test")
-async def test():
-    if debug:
-        print("Test route accessed")
-    return JSONResponse(status_code=200, content={"message": "Chatbot is ready"})
+@app.get("/")
+def read_root():
+    return {"message": "chatbot is working"}
 
 @app.post("/chat/start")
 async def start_chat():
